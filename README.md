@@ -1,0 +1,1 @@
+# medic_mini_app
