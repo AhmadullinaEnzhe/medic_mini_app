@@ -511,7 +511,7 @@
 
     <script>
         let tg = window.Telegram.WebApp;
-        let currentResults = [];
+        let analysisResults = {};
         
         // Инициализация Telegram Web App
         if (tg) {
@@ -553,6 +553,7 @@
             const neutrophils = parseFloat(document.getElementById('neutrophils').value);
             const lymphocytes = parseFloat(document.getElementById('lymphocytes').value);
             
+            const userId = tg.initDataUnsafe.user.id;
             let results = [];
             let hasData = false;
             
@@ -770,7 +771,7 @@
                 return;
             }
             
-            currentResults = results;
+            analysisResults[userId] = results;
             showResults('blood-general', results);
         }
         
@@ -789,6 +790,7 @@
             const totalProtein = parseFloat(document.getElementById('total-protein').value);
             const albumin = parseFloat(document.getElementById('albumin').value);
             
+            const userId = tg.initDataUnsafe.user.id;
             let results = [];
             let hasData = false;
             
@@ -1078,7 +1080,8 @@
                 return;
             }
             
-            currentResults = results;
+
+            analysisResults[userId] = results;
             showResults('blood-bio', results);
         }
         
@@ -1093,6 +1096,7 @@
             const urineErythrocytes = parseInt(document.getElementById('urine-erythrocytes').value);
             const epithelium = parseInt(document.getElementById('epithelium').value);
             
+            const userId = tg.initDataUnsafe.user.id;
             let results = [];
             let hasData = false;
             
@@ -1302,7 +1306,7 @@
                 return;
             }
             
-            currentResults = results;
+            analysisResults[userId] = results;
             showResults('urine-general', results);
         }
         
@@ -1315,6 +1319,7 @@
             const thrombinTime = parseFloat(document.getElementById('thrombin-time').value);
             const dDimer = parseFloat(document.getElementById('d-dimer').value);
             
+            const userId = tg.initDataUnsafe.user.id;
             let results = [];
             let hasData = false;
             
@@ -1505,7 +1510,7 @@
                 return;
             }
             
-            currentResults = results;
+            analysisResults[userId] = results;
             showResults('hemostasis', results);
         }
         
@@ -1554,72 +1559,52 @@
                 'urine-general': 'Общий анализ мочи',
                 'hemostasis': 'Гемостазиограмма'
             };
-            
-            // Формируем сообщение для отправки
-            let message = `🧪 *${typeNames[type]}*:\n\n`;
-            
-            currentResults.forEach((result, index) => {
-                const statusIcon = result.status === 'normal' ? '✅' : result.status === 'warning' ? '⚠️' : '❌';
-                message += `${statusIcon} *${result.parameter}:* ${result.value}\n`;
-                message += `${result.explanation}\n\n`;
-            });
-            
-            // Добавляем общую рекомендацию
-            const hasWarnings = currentResults.some(result => result.status === 'warning');
-            if (hasWarnings) {
-                message += "💡 *Рекомендация:* Некоторые показатели требуют внимания. Рекомендуется проконсультироваться с врачом для точной диагностики и назначения лечения.";
-            } else {
-                message += "🎉 *Отличные результаты!* Все показатели в норме. Продолжайте вести здоровый образ жизни!";
-            }
+
+            const resultsData = currentResults.map(result => ({
+                parameter: result.parameter,
+                value: result.value,
+                status: result.status,
+                explanation: result.explanation
+            }));
+
+            const dataToSend = {
+                action: 'analysis_results',
+                type: type,
+                results: resultsData,
+                timestamp: new Date().toISOString(),
+                recommendation: currentResults.some(result => result.status === 'warning')
+                    ? "💡 *Рекомендация:* Некоторые показатели требуют внимания. Рекомендуется проконсультироваться с врачом для точной диагностики и назначения лечения."
+                    : "🎉 *Отличные результаты!* Все показатели в норме. Продолжайте вести здоровый образ жизни!"
+            };
 
             // Проверяем, находимся ли мы в Telegram Mini App
             if (window.Telegram && window.Telegram.WebApp) {
                 const tg = window.Telegram.WebApp;
                 
                 try {
-                    // Способ 1: Отправка данных через sendData
-                    tg.sendData(JSON.stringify({
-                        action: 'analysis_results',
-                        type: type,
-                        message: message,
-                        results: currentResults,
-                        timestamp: new Date().toISOString()
-                    }));
+                    // Отправка данных через sendData
+                    tg.sendData(JSON.stringify(dataToSend));
                     
-                    // Способ 2: Показываем всплывающее окно с результатами
-                    tg.showPopup({
-                        title: 'Результаты готовы!',
-                        message: 'Результаты анализа были отправлены в чат. Проверьте историю переписки с ботом.',
-                        buttons: [{ type: 'ok' }]
-                    });
-                    
+                    // Уведомление об успешной отправке
+                    alert('✅ Результаты отправлены в чат!');
                     showNotification('✅ Результаты отправлены в чат!');
                     
                 } catch (error) {
                     console.error('Ошибка при отправке:', error);
-                    // Если отправка не удалась, показываем результаты в попапе
-                    tg.showPopup({
-                        title: 'Результаты анализа',
-                        message: message.substring(0, 200) + '...', // Ограничиваем длину
-                        buttons: [{ type: 'ok' }]
-                    });
-                    showNotification('📋 Результаты показаны во всплывающем окне');
+                    // Если отправка не удалась, показываем сообщение об ошибке
+                    alert('Не удалось отправить результаты в чат. Пожалуйста, попробуйте еще раз.');
+                    showNotification('📋 Произошла ошибка при отправке результатов');
                 }
             } else {
                 // Если не в Telegram, показываем результаты в alert
-                alert('Результаты анализа:\n\n' + message);
+                alert('Результаты анализа:\n\n' + dataToSend.recommendation);
                 showNotification('📋 Результаты показаны в окне браузера');
             }
             
             // Логируем для отладки
-            console.log('Отправляемые данные:', {
-                action: 'analysis_results',
-                type: type,
-                message: message,
-                results: currentResults
-            });
+            console.log('Отправляемые данные:', dataToSend);
         }
-        
+
         function copyToClipboard() {
             let message = "🧪 Результаты анализа:\n\n";
             
