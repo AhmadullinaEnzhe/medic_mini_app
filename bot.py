@@ -60,7 +60,7 @@ async def show_results(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     # Создаем Application
-    application = Application.builder().token("8285059274:AAF4zkz-v5WQEKIpoNzJp4-ikRiaa1TQRps").build()
+    application = Application.builder().token("YOUR_BOT_TOKEN").build()
     
     # Добавляем обработчик данных из Web App
     application.add_handler(CommandHandler("start", start))
